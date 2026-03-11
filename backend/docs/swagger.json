@@ -1,0 +1,162 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Personal Finance API",
+    "version": "1.0.0",
+    "description": "REST API for managing personal income and expense transactions."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/api/transactions": {
+      "get": {
+        "summary": "Get all transactions",
+        "description": "Returns a list of all transactions sorted by most recent first.",
+        "responses": {
+          "200": {
+            "description": "A list of transactions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Transaction"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a transaction",
+        "description": "Adds a new income or expense transaction.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionInput"
+              },
+              "example": {
+                "type": "expense",
+                "amount": 45.50,
+                "category": "Food",
+                "date": "2026-03-10",
+                "note": "Grocery run"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Transaction created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transactions/{id}": {
+      "delete": {
+        "summary": "Delete a transaction",
+        "description": "Deletes a transaction by its MongoDB ID.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "MongoDB ObjectId of the transaction",
+            "schema": {
+              "type": "string",
+              "example": "65f1a2b3c4d5e6f7a8b9c0d1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TransactionInput": {
+        "type": "object",
+        "required": ["type", "amount", "category", "date"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["income", "expense"],
+            "example": "expense"
+          },
+          "amount": {
+            "type": "number",
+            "example": 45.50
+          },
+          "category": {
+            "type": "string",
+            "example": "Food"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-03-10"
+          },
+          "note": {
+            "type": "string",
+            "example": "Grocery run"
+          }
+        }
+      },
+      "Transaction": {
+        "allOf": [
+          { "$ref": "#/components/schemas/TransactionInput" },
+          {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "example": "65f1a2b3c4d5e6f7a8b9c0d1"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-03-10T10:30:00.000Z"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-03-10T10:30:00.000Z"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
