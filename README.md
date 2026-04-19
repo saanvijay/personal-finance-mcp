@@ -76,14 +76,17 @@ Visit [http://localhost:3000/api-docs](http://localhost:3000/api-docs)
 
 ---
 
-## MCP Server (HTTP + SSE)
+## MCP Server (Streamable HTTP)
 
 This project includes an MCP (Model Context Protocol) server that lets MCP clients (Claude Desktop, MCP Inspector, etc.) interact with your personal finance data using natural language.
 
-The server runs over **HTTP with Server-Sent Events (SSE)** on port `3100` by default.
+The server uses the **Streamable HTTP** transport on port `3100` by default. A single endpoint handles all traffic; the session id is tracked via the `mcp-session-id` header.
 
-- SSE stream: `GET http://localhost:3100/sse`
-- Client→server messages: `POST http://localhost:3100/messages?sessionId=<id>`
+| Method | Path  | Purpose |
+|--------|-------|---------|
+| POST   | `/mcp` | Initialize a session and send JSON-RPC requests |
+| GET    | `/mcp` | Open the SSE stream for server→client notifications |
+| DELETE | `/mcp` | Terminate a session |
 
 ### Running the MCP server
 
@@ -132,8 +135,8 @@ npx @modelcontextprotocol/inspector
 ```
 
 In the Inspector UI:
-1. Set **Transport Type** → `SSE`
-2. Set **URL** → `http://localhost:3100/sse`
+1. Set **Transport Type** → `Streamable HTTP`
+2. Set **URL** → `http://localhost:3100/mcp`
 3. Click **Connect**, then invoke any tool (`get_transactions`, `create_transaction`, `delete_transaction`).
 
 ### Claude Desktop Configuration
@@ -149,14 +152,14 @@ In the Inspector UI:
 
 **2. Add the MCP server**
 
-Claude Desktop connects to local stdio servers natively; for an SSE server, use the [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) bridge:
+Claude Desktop connects to local stdio servers natively; for a Streamable HTTP server, use the [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) bridge:
 
 ```json
 {
   "mcpServers": {
     "personal-finance": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "http://localhost:3100/sse"]
+      "args": ["-y", "mcp-remote", "http://localhost:3100/mcp"]
     }
   }
 }
