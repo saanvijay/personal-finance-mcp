@@ -1,13 +1,12 @@
-// MCP stdio uses stdout for protocol — redirect all console.log to stderr
-console.log = (...args) => console.error(...args);
-
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
+const express = require('express');
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
-const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
+const { SSEServerTransport } = require('@modelcontextprotocol/sdk/server/sse.js');
 const { z } = require('zod');
 
 const API_BASE = process.env.API_BASE || 'http://localhost:3000';
+const PORT = process.env.MCP_PORT || 3100;
 
 const server = new McpServer({
   name: 'personal-finance',
@@ -62,8 +61,29 @@ server.tool(
   }
 );
 
-// Start with stdio transport
-const transport = new StdioServerTransport();
-server.connect(transport).then(() => {
-  console.error('Personal Finance MCP server running');
+const app = express();
+
+const transports = {};
+
+app.get('/sse', async (req, res) => {
+  const transport = new SSEServerTransport('/messages', res);
+  transports[transport.sessionId] = transport;
+  res.on('close', () => {
+    delete transports[transport.sessionId];
+  });
+  await server.connect(transport);
+});
+
+app.post('/messages', async (req, res) => {
+  const sessionId = req.query.sessionId;
+  const transport = transports[sessionId];
+  if (!transport) {
+    res.status(400).send('No transport found for sessionId');
+    return;
+  }
+  await transport.handlePostMessage(req, res);
+});
+
+app.listen(PORT, () => {
+  console.log(`Personal Finance MCP server (SSE) listening on http://localhost:${PORT}/sse`);
 });

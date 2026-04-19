@@ -50,6 +50,7 @@ Create a `backend/.env` file:
 PORT=3000
 MONGO_URI=mongodb://127.0.0.1:27017/personal-finance
 API_BASE=http://localhost:3000
+MCP_PORT=3100
 ```
 
 **4. Start the server**
@@ -75,9 +76,26 @@ Visit [http://localhost:3000/api-docs](http://localhost:3000/api-docs)
 
 ---
 
-## MCP Server (Claude Desktop Integration)
+## MCP Server (HTTP + SSE)
 
-This project includes an MCP (Model Context Protocol) server that lets Claude Desktop interact with your personal finance data using natural language.
+This project includes an MCP (Model Context Protocol) server that lets MCP clients (Claude Desktop, MCP Inspector, etc.) interact with your personal finance data using natural language.
+
+The server runs over **HTTP with Server-Sent Events (SSE)** on port `3100` by default.
+
+- SSE stream: `GET http://localhost:3100/sse`
+- Client→server messages: `POST http://localhost:3100/messages?sessionId=<id>`
+
+### Running the MCP server
+
+The MCP server calls the backend API, so the API must be running too.
+
+```bash
+# Terminal 1 — backend API (port 3000)
+cd backend && npm start
+
+# Terminal 2 — MCP server (port 3100)
+cd backend && npm run mcp
+```
 
 ### Available Tools
 
@@ -105,9 +123,22 @@ This project includes an MCP (Model Context Protocol) server that lets Claude De
 
 ---
 
+### Testing with MCP Inspector
+
+The easiest way to exercise the tools is the official MCP Inspector:
+
+```bash
+npx @modelcontextprotocol/inspector
+```
+
+In the Inspector UI:
+1. Set **Transport Type** → `SSE`
+2. Set **URL** → `http://localhost:3100/sse`
+3. Click **Connect**, then invoke any tool (`get_transactions`, `create_transaction`, `delete_transaction`).
+
 ### Claude Desktop Configuration
 
-> **Important:** The Express server (`npm start`) must be running before using the MCP tools in Claude Desktop.
+> **Important:** Both the backend API (`npm start`) and the MCP server (`npm run mcp`) must be running before using the tools in Claude Desktop.
 
 **1. Find your Claude Desktop config file**
 
@@ -118,20 +149,18 @@ This project includes an MCP (Model Context Protocol) server that lets Claude De
 
 **2. Add the MCP server**
 
-Open the config file and add the `personal-finance` entry under `mcpServers`:
+Claude Desktop connects to local stdio servers natively; for an SSE server, use the [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) bridge:
 
 ```json
 {
   "mcpServers": {
     "personal-finance": {
-      "command": "node",
-      "args": ["/full-path/personal-finance/backend/mcp/server.js"]
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://localhost:3100/sse"]
     }
   }
 }
 ```
-
-> Update the path in `args` to match your actual project location.
 
 **3. Restart Claude Desktop**
 
