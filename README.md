@@ -12,13 +12,21 @@ personal-finance/
 │   └── app.js                # Frontend logic (fetch API calls)
 ├── backend/
 │   ├── mcp/
-│   │   └── server.js         # MCP server (Claude Desktop integration)
+│   │   ├── server.js         # MCP server (Claude Desktop integration)
+│   │   └── Dockerfile        # Container image for the MCP server
 │   ├── docs/
 │   │   └── swagger.json      # OpenAPI specification
+│   ├── test/
+│   │   ├── transactions.test.js  # API integration tests
+│   │   └── mcp.test.js           # MCP tool handler tests
 │   ├── server.js             # Express server + MongoDB routes
 │   ├── .env                  # Environment variables (not committed)
+│   ├── .dockerignore
 │   ├── package.json
 │   └── package-lock.json
+├── .github/
+│   └── workflows/
+│       └── ci.yml            # GitHub Actions: tests + Docker build
 ├── .gitignore
 └── README.md
 ```
@@ -73,6 +81,55 @@ Visit [http://localhost:3000/api-docs](http://localhost:3000/api-docs)
 - View total balance, income, and expenses
 - Delete transactions
 - Data persisted in MongoDB
+
+---
+
+## Testing
+
+Tests use Node's built-in test runner (`node:test`), [`supertest`](https://www.npmjs.com/package/supertest) for HTTP assertions, and [`mongodb-memory-server`](https://www.npmjs.com/package/mongodb-memory-server) so tests run against a real, ephemeral MongoDB without needing a local server.
+
+```bash
+cd backend
+npm install
+npm test
+```
+
+| File | Covers |
+|------|--------|
+| `backend/test/transactions.test.js` | `GET`/`POST`/`DELETE /api/transactions` — happy paths, validation 400s, sort order |
+| `backend/test/mcp.test.js` | `get_transactions`, `create_transaction`, `delete_transaction` MCP handlers (mocks `fetch`) |
+
+The first run downloads the MongoDB binary into `~/.cache/mongodb-binaries`; subsequent runs are fast.
+
+---
+
+## Docker (MCP server)
+
+A Dockerfile is provided for the MCP server at `backend/mcp/Dockerfile`. The build context is the `backend/` directory because the image shares `package.json` with the API.
+
+```bash
+cd backend
+docker build -f mcp/Dockerfile -t personal-finance-mcp .
+docker run -p 3100:3100 \
+  -e API_BASE=http://host.docker.internal:3000 \
+  personal-finance-mcp
+```
+
+Notes:
+- Inside the container, `localhost` refers to the container itself. Use `host.docker.internal` (macOS/Windows) or a docker network hostname to reach the backend API on the host.
+- The image installs production dependencies only (`npm ci --omit=dev`) and excludes `test/`, `node_modules`, and `.env` via `.dockerignore`.
+
+---
+
+## Continuous Integration
+
+GitHub Actions runs on every push and PR to `main` (`.github/workflows/ci.yml`):
+
+| Job | What it does |
+|-----|--------------|
+| `backend` | `npm ci` → `node --check` → `npm test` on Node 20 & 22 |
+| `frontend` | `node --check frontend/app.js` |
+| `docker-mcp` | Builds the MCP image, runs it, waits for `:3100`, and posts a real MCP `initialize` handshake to `/mcp` |
 
 ---
 

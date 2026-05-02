@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Cache mongodb-memory-server binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check (server.js)
+        run: node --check server.js
+
+      - name: Syntax check (mcp/server.js)
+        run: node --check mcp/server.js
+
+      - name: Run tests
+        run: npm test
+
+  frontend:
+    name: Frontend syntax check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Syntax check (frontend/app.js)
+        run: node --check frontend/app.js
+
+  docker-mcp:
+    name: Build and test MCP container
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build MCP image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/mcp/Dockerfile
+          tags: personal-finance-mcp:ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run MCP container
+        run: |
+          docker run -d --name mcp \
+            -p 3100:3100 \
+            -e API_BASE=http://localhost:3000 \
+            personal-finance-mcp:ci
+
+      - name: Wait for MCP server to be ready
+        run: |
+          for i in {1..30}; do
+            if (echo > /dev/tcp/127.0.0.1/3100) >/dev/null 2>&1; then
+              echo "MCP server is listening on :3100"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "MCP server did not start in time"
+          docker logs mcp
+          exit 1
+
+      - name: Smoke test MCP initialize handshake
+        run: |
+          response=$(curl -sS -o /tmp/mcp-resp.txt -w "%{http_code}" \
+            -X POST http://127.0.0.1:3100/mcp \
+            -H 'Content-Type: application/json' \
+            -H 'Accept: application/json, text/event-stream' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}')
+          echo "HTTP $response"
+          cat /tmp/mcp-resp.txt
+          test "$response" = "200"
+
+      - name: Verify container still running
+        run: |
+          state=$(docker inspect -f '{{.State.Running}}' mcp)
+          test "$state" = "true"
+
+      - name: Dump container logs
+        if: always()
+        run: docker logs mcp || true
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f mcp || true
