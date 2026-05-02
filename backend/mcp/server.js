@@ -1,5 +1,3 @@
-require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
-
 const { randomUUID } = require('node:crypto');
 const express = require('express');
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
@@ -8,7 +6,6 @@ const { isInitializeRequest } = require('@modelcontextprotocol/sdk/types.js');
 const { z } = require('zod');
 
 const API_BASE = process.env.API_BASE || 'http://localhost:3000';
-const PORT = process.env.MCP_PORT || 3100;
 
 async function getTransactions() {
   const res = await fetch(`${API_BASE}/api/transactions`);
@@ -118,12 +115,6 @@ function createApp() {
   app.delete('/mcp', handleSessionRequest);
 
   return app;
-}
-
-if (require.main === module) {
-  createApp().listen(PORT, () => {
-    console.log(`Personal Finance MCP server (Streamable HTTP) listening on http://localhost:${PORT}/mcp`);
-  });
 }
 
 module.exports = { createServer, createApp, getTransactions, createTransaction, deleteTransaction };

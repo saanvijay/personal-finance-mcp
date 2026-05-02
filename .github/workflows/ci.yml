@@ -45,6 +45,9 @@ jobs:
       - name: Syntax check (mcp/server.js)
         run: node --check mcp/server.js
 
+      - name: Syntax check (mcp/index.js)
+        run: node --check mcp/index.js
+
       - name: Run tests
         run: npm test
 
@@ -87,17 +90,24 @@ jobs:
 
       - name: Run MCP container
         run: |
-          docker run -d --name mcp \
+          docker run -d --init --name mcp \
             -p 3100:3100 \
             -e API_BASE=http://localhost:3000 \
             personal-finance-mcp:ci
 
-      - name: Wait for MCP server to be ready
+      - name: Wait for MCP server to log "listening"
         run: |
           for i in {1..30}; do
-            if (echo > /dev/tcp/127.0.0.1/3100) >/dev/null 2>&1; then
-              echo "MCP server is listening on :3100"
+            if docker logs mcp 2>&1 | grep -q "listening on"; then
+              echo "MCP server is up"
+              docker logs mcp
               exit 0
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' mcp 2>/dev/null)" != "true" ]; then
+              echo "Container exited before becoming ready"
+              docker ps -a --filter name=mcp
+              docker logs mcp
+              exit 1
             fi
             sleep 1
           done
@@ -105,7 +115,18 @@ jobs:
           docker logs mcp
           exit 1
 
-      - name: Smoke test MCP initialize handshake
+      - name: Smoke test — invalid request returns 400
+        run: |
+          response=$(curl -sS -o /tmp/mcp-resp.txt -w "%{http_code}" \
+            -X POST http://127.0.0.1:3100/mcp \
+            -H 'Content-Type: application/json' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"ping"}')
+          echo "HTTP $response"
+          cat /tmp/mcp-resp.txt
+          echo
+          test "$response" = "400"
+
+      - name: Smoke test — initialize handshake returns 200
         run: |
           response=$(curl -sS -o /tmp/mcp-resp.txt -w "%{http_code}" \
             -X POST http://127.0.0.1:3100/mcp \
@@ -114,6 +135,7 @@ jobs:
             --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}')
           echo "HTTP $response"
           cat /tmp/mcp-resp.txt
+          echo
           test "$response" = "200"
 
       - name: Verify container still running

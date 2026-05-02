@@ -1,5 +1,7 @@
 # Personal Finance
 
+[![CI](https://github.com/saanvijay/personal-finance-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/saanvijay/personal-finance-mcp/actions/workflows/ci.yml)
+
 A simple personal finance web app to track income and expenses, backed by MongoDB.
 
 ## Project Structure
@@ -123,13 +125,17 @@ Notes:
 
 ## Continuous Integration
 
-GitHub Actions runs on every push and PR to `main` (`.github/workflows/ci.yml`):
+[![CI](https://github.com/saanvijay/personal-finance-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/saanvijay/personal-finance-mcp/actions/workflows/ci.yml)
 
-| Job | What it does |
-|-----|--------------|
-| `backend` | `npm ci` → `node --check` → `npm test` on Node 20 & 22 |
-| `frontend` | `node --check frontend/app.js` |
-| `docker-mcp` | Builds the MCP image, runs it, waits for `:3100`, and posts a real MCP `initialize` handshake to `/mcp` |
+GitHub Actions runs on every push and PR to `main` (`.github/workflows/ci.yml`). Three jobs run in parallel:
+
+| Job | What it does | Matrix |
+|-----|--------------|--------|
+| `backend` | `npm ci` → `node --check` → `npm test` (13 tests) | Node 20.x, 22.x |
+| `frontend` | `node --check frontend/app.js` | Node 20.x |
+| `docker-mcp` | Build the MCP image with Buildx (GHA cache) → `docker run --init` → wait for the `listening on …` log line → POST `{}` and assert 400 → POST a real MCP `initialize` and assert 200 → verify the container is still running | — |
+
+Live status and logs: <https://github.com/saanvijay/personal-finance-mcp/actions/workflows/ci.yml>
 
 ---
 
