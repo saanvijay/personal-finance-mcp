@@ -202,6 +202,8 @@ In the Inspector UI:
 2. Set **URL** → `http://localhost:3100/mcp`
 3. Click **Connect**, then invoke any tool (`get_transactions`, `create_transaction`, `delete_transaction`).
 
+![MCP Inspector](screen-shots/mcp-inspector.png)
+
 ### Claude Desktop Configuration
 
 > **Important:** Both the backend API (`npm start`) and the MCP server (`npm run mcp`) must be running before using the tools in Claude Desktop.
@@ -231,6 +233,8 @@ Claude Desktop connects to local stdio servers natively; for a Streamable HTTP s
 **3. Restart Claude Desktop**
 
 Quit and reopen Claude Desktop. The tools will appear automatically.
+
+![MCP Claude Connector](screen-shots/claude-mcp-connector.png)
 
 **4. Example prompts you can use**
 
